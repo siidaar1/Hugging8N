@@ -4,6 +4,7 @@ set -euo pipefail
 API_URL="https://api.uptimerobot.com/v2"
 API_KEY="${UPTIMEROBOT_API_KEY:-}"
 SPACE_HOST_INPUT="${1:-${SPACE_HOST:-}}"
+STATUS_FILE="/tmp/hugging8n-uptimerobot-status.json"
 
 if [ -z "$API_KEY" ]; then
   echo "Missing UPTIMEROBOT_API_KEY."
@@ -22,7 +23,7 @@ SPACE_HOST_CLEAN="${SPACE_HOST_CLEAN%%/*}"
 
 MONITOR_URL="https://${SPACE_HOST_CLEAN}/health"
 MONITOR_NAME="${UPTIMEROBOT_MONITOR_NAME:-Hugging8n ${SPACE_HOST_CLEAN}}"
-INTERVAL="${UPTIMEROBOT_INTERVAL:-5}"
+INTERVAL="${UPTIMEROBOT_INTERVAL:-300}"
 
 MONITORS_RESPONSE=$(curl -sS -X POST "${API_URL}/getMonitors" \
   -d "api_key=${API_KEY}" \
@@ -36,6 +37,8 @@ MONITOR_ID=$(printf '%s' "$MONITORS_RESPONSE" | jq -r --arg url "$MONITOR_URL" '
 ')
 
 if [ -n "$MONITOR_ID" ]; then
+  printf '{"configured":true,"monitorId":"%s","url":"%s","alreadyExisted":true,"timestamp":"%s"}\n' \
+    "$MONITOR_ID" "$MONITOR_URL" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATUS_FILE"
   echo "Monitor already exists (id=${MONITOR_ID}) for ${MONITOR_URL}"
   exit 0
 fi
@@ -59,9 +62,13 @@ CREATE_RESPONSE=$(curl "${CURL_ARGS[@]}")
 CREATE_STATUS=$(printf '%s' "$CREATE_RESPONSE" | jq -r '.stat // "fail"')
 
 if [ "$CREATE_STATUS" != "ok" ]; then
+  printf '{"configured":false,"error":"creation failed","timestamp":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATUS_FILE"
   printf '%s\n' "$CREATE_RESPONSE"
   exit 1
 fi
 
 NEW_ID=$(printf '%s' "$CREATE_RESPONSE" | jq -r '.monitor.id // empty')
+printf '{"configured":true,"monitorId":"%s","url":"%s","timestamp":"%s"}\n' \
+  "${NEW_ID:-}" "$MONITOR_URL" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATUS_FILE"
 echo "Created UptimeRobot monitor ${NEW_ID:-"(id unavailable)"} for ${MONITOR_URL}"

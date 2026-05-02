@@ -12,6 +12,8 @@ secrets:
     description: HuggingFace token with write access. Used for automatic workspace backup.
   - name: CLOUDFLARE_WORKERS_TOKEN
     description: Cloudflare API token for automatic Worker proxy setup.
+  - name: UPTIMEROBOT_API_KEY
+    description: UptimeRobot API key for automatic monitor setup.
 ---
 
 <!-- Badges -->
@@ -45,7 +47,7 @@ secrets:
 - 🔐 **Secure by Default:** Uses n8n's native user management and restricted file permissions (`umask 0077`).
 - 🌐 **Built-in Connectivity:** Includes transparent outbound proxying via Cloudflare Workers for Telegram, WhatsApp-related APIs, Google APIs, Discord, and other external services.
 - 📊 **Premium Dashboard:** Beautiful Web UI at `/` for real-time monitoring of uptime, sync health, and n8n status.
-- ⏰ **Easy Keep-Alive:** Set up a one-time UptimeRobot monitor directly from the dashboard to keep your free Space awake.
+- ⏰ **Easy Keep-Alive:** Add `UPTIMEROBOT_API_KEY` as a Space secret and the monitor is created automatically at boot — no manual setup.
 - 🐳 **Optimized Infrastructure:** Minimal resource usage with clean startup logs and production-ready proxying.
 
 ## 🎥 Video Tutorial
@@ -124,14 +126,7 @@ Hugging8n automatically creates a private dataset named `hugging8n-backup` in yo
 
 ## 💓 Staying Alive *(Recommended on Free HF Spaces)*
 
-To help keep your Space awake, set up an external [UptimeRobot](https://uptimerobot.com/) monitor directly from the dashboard UI.
-
-1. Open your Space's dashboard (`/`).
-2. Find the **Keep Space Awake** section.
-3. Paste your UptimeRobot **Main API key**.
-4. Click **Create Monitor**.
-
-Hugging8n will automatically create a monitor for your Space's `/health` endpoint.
+Add your [UptimeRobot](https://uptimerobot.com/) **Main API key** as a Space secret named `UPTIMEROBOT_API_KEY`. Hugging8n will automatically create a monitor for your Space's `/health` endpoint at boot. The dashboard shows the current status (configured, setting up, or failed).
 
 ## 🔐 Security & Advanced *(Optional)*
 
@@ -142,14 +137,13 @@ Customize your instance with these environment variables:
 | `GENERIC_TIMEZONE` | `UTC` | Timezone for your n8n instance |
 | `N8N_LOG_LEVEL` | `error` | Set to `info` or `debug` for more details |
 | `CLOUDFLARE_WORKERS_TOKEN` | — | Cloudflare API token for automatic Worker setup |
-| `CLOUDFLARE_PROXY_DOMAINS` | `*` | Comma-separated domains to proxy (or `*` for all external traffic) |
+| `CLOUDFLARE_PROXY_DOMAINS` | — | Extra domains to proxy, merged with built-in defaults. Set to `*` to proxy all external traffic. Leave unset to use defaults only. |
 | `CLOUDFLARE_PROXY_SECRET` | — | Optional shared secret for proxy authentication |
 | `CLOUDFLARE_WORKER_NAME` | auto | Custom name for the automatically created Worker |
 | `CLOUDFLARE_ACCOUNT_ID` | auto | Optional Cloudflare account ID override |
 | `SPACE_HOST_OVERRIDE` | — | Override detected host for custom domains |
 | `N8N_STARTUP_TIMEOUT` | `180` | Max seconds to wait for n8n readiness |
-| `UPTIMEROBOT_SETUP_ENABLED` | `true` | Enable/disable dashboard helper endpoint |
-| `UPTIMEROBOT_RATE_LIMIT_PER_MINUTE` | `5` | Rate limit for monitor creation |
+| `UPTIMEROBOT_API_KEY` | — | UptimeRobot Main API key. When set, a monitor is created automatically at boot. |
 
 ## 💻 Local Development
 
@@ -177,9 +171,9 @@ docker run -p 7861:7861 --env-file .env hugging8n
 
 ## 🐛 Troubleshooting
 
-- **Telegram/Google/WhatsApp not connecting:** Ensure `CLOUDFLARE_WORKERS_TOKEN` or `CLOUDFLARE_PROXY_URL` is set correctly, or keep `CLOUDFLARE_PROXY_DOMAINS=*`.
+- **Telegram/Google/WhatsApp not connecting:** Ensure `CLOUDFLARE_WORKERS_TOKEN` or `CLOUDFLARE_PROXY_URL` is set. Use `CLOUDFLARE_PROXY_DOMAINS=*` to proxy all external traffic.
 - **Workflows not saving:** Check if `HF_TOKEN` has **Write** access to your account.
-- **Space keeps sleeping:** Use the dashboard to set up an UptimeRobot monitor.
+- **Space keeps sleeping:** Add `UPTIMEROBOT_API_KEY` as a Space secret to enable automatic keep-awake monitoring.
 - **Authentication errors:** n8n v2 uses its own internal users; ensure you created the owner account on first run.
 
 ## 🌟 More Projects
@@ -202,9 +196,11 @@ Similar projects by [@somratpro](https://github.com/somratpro) — all free, one
 If Hugging8n saves you time, consider buying me a coffee to keep the projects alive!
 
 **USDT (TRC-20 / TRON network only)**
+
 ```
 TELx8TJz1W1h7n6SgpgGNNGZXpJCEUZrdB
 ```
+
 > [!WARNING]
 > Send **USDT on TRC-20 network only**. Sending other tokens or using a different network will result in permanent loss.
 
