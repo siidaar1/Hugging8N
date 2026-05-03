@@ -35,10 +35,10 @@ COPY --chown=node:node cloudflare-proxy-setup.py /home/node/app/cloudflare-proxy
 # Set NODE_OPTIONS after preload scripts are copied
 ENV NODE_OPTIONS="--require /opt/cloudflare-proxy.js"
 COPY --chown=node:node n8n-sync.py /home/node/app/n8n-sync.py
-COPY --chown=node:node setup-uptimerobot.sh /home/node/app/setup-uptimerobot.sh
+COPY --chown=node:node cloudflare-keepalive-setup.py /home/node/app/cloudflare-keepalive-setup.py
 COPY --chown=node:node start.sh /home/node/app/start.sh
 
-RUN chmod +x /home/node/app/start.sh /home/node/app/setup-uptimerobot.sh /home/node/app/cloudflare-proxy-setup.py
+RUN chmod +x /home/node/app/start.sh /home/node/app/cloudflare-keepalive-setup.py /home/node/app/cloudflare-proxy-setup.py
 
 USER node
 

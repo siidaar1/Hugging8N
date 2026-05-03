@@ -11,9 +11,7 @@ secrets:
   - name: HF_TOKEN
     description: HuggingFace token with write access. Used for automatic workspace backup.
   - name: CLOUDFLARE_WORKERS_TOKEN
-    description: Cloudflare API token for automatic Worker proxy setup.
-  - name: UPTIMEROBOT_API_KEY
-    description: UptimeRobot API key for automatic monitor setup.
+    description: Cloudflare API token for automatic Worker proxy and KeepAlive setup.
 ---
 
 <!-- Badges -->
@@ -47,7 +45,7 @@ secrets:
 - 🔐 **Secure by Default:** Uses n8n's native user management and restricted file permissions (`umask 0077`).
 - 🌐 **Built-in Connectivity:** Includes transparent outbound proxying via Cloudflare Workers for Telegram, WhatsApp-related APIs, Google APIs, Discord, and other external services.
 - 📊 **Premium Dashboard:** Beautiful Web UI at `/` for real-time monitoring of uptime, sync health, and n8n status.
-- ⏰ **Easy Keep-Alive:** Add `UPTIMEROBOT_API_KEY` as a Space secret and the monitor is created automatically at boot — no manual setup.
+- ⏰ **Easy Keep-Alive:** Uses `CLOUDFLARE_WORKERS_TOKEN` to automatically set up a cron-triggered keep-awake worker at boot.
 - 🐳 **Optimized Infrastructure:** Minimal resource usage with clean startup logs and production-ready proxying.
 
 ## 🎥 Video Tutorial
@@ -126,7 +124,7 @@ Hugging8n automatically creates a private dataset named `hugging8n-backup` in yo
 
 ## 💓 Staying Alive *(Recommended on Free HF Spaces)*
 
-Add your [UptimeRobot](https://uptimerobot.com/) **Main API key** as a Space secret named `UPTIMEROBOT_API_KEY`. Hugging8n will automatically create a monitor for your Space's `/health` endpoint at boot. The dashboard shows the current status (configured, setting up, or failed).
+Your Space will automatically be kept awake by a background Cloudflare Worker when you configure the `CLOUDFLARE_WORKERS_TOKEN` secret. The worker uses a cron trigger to regularly ping your Space's `/health` endpoint. The dashboard displays the current keep-alive worker status.
 
 ## 🔐 Security & Advanced *(Optional)*
 
@@ -143,7 +141,7 @@ Customize your instance with these environment variables:
 | `CLOUDFLARE_ACCOUNT_ID` | auto | Optional Cloudflare account ID override |
 | `SPACE_HOST_OVERRIDE` | — | Override detected host for custom domains |
 | `N8N_STARTUP_TIMEOUT` | `180` | Max seconds to wait for n8n readiness |
-| `UPTIMEROBOT_API_KEY` | — | UptimeRobot Main API key. When set, a monitor is created automatically at boot. |
+| `CLOUDFLARE_KEEPALIVE_ENABLED` | `true` | Set to `false` to disable the automatic Cloudflare KeepAlive worker |
 
 ## 💻 Local Development
 
@@ -173,7 +171,7 @@ docker run -p 7861:7861 --env-file .env hugging8n
 
 - **Telegram/Google/WhatsApp not connecting:** Ensure `CLOUDFLARE_WORKERS_TOKEN` or `CLOUDFLARE_PROXY_URL` is set. Use `CLOUDFLARE_PROXY_DOMAINS=*` to proxy all external traffic.
 - **Workflows not saving:** Check if `HF_TOKEN` has **Write** access to your account.
-- **Space keeps sleeping:** Add `UPTIMEROBOT_API_KEY` as a Space secret to enable automatic keep-awake monitoring.
+- **Space keeps sleeping:** Add `CLOUDFLARE_WORKERS_TOKEN` as a Space secret to enable automatic keep-awake monitoring via Cloudflare Workers.
 - **Authentication errors:** n8n v2 uses its own internal users; ensure you created the owner account on first run.
 
 ## 🌟 More Projects
@@ -182,6 +180,7 @@ Similar projects by [@somratpro](https://github.com/somratpro) — all free, one
 
 | Project | What it runs | HF Space | GitHub |
 | :--- | :--- | :--- | :--- |
+| **HuggingMess** | Hermes — Self-hosted agent gateway | [Space](https://huggingface.co/spaces/somratpro/HuggingMess) | [Repo](https://github.com/somratpro/huggingmess) |
 | **HuggingClaw** | OpenClaw — Claude Code in the browser | [Space](https://huggingface.co/spaces/somratpro/HuggingClaw) | [Repo](https://github.com/somratpro/huggingclaw) |
 | **HuggingClip** | Paperclip — AI agent orchestration platform | [Space](https://huggingface.co/spaces/somratpro/HuggingClip) | [Repo](https://github.com/somratpro/huggingclip) |
 

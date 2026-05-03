@@ -118,9 +118,9 @@ fi
 node "$APP_DIR/health-server.js" &
 PROXY_PID=$!
 
-if [ -n "${UPTIMEROBOT_API_KEY:-}" ] && [ -n "${SPACE_HOST_DETECTED:-}" ]; then
-  echo "Setting up UptimeRobot monitor..."
-  bash "$APP_DIR/setup-uptimerobot.sh" "$SPACE_HOST_DETECTED" || true
+if [ -n "${CLOUDFLARE_WORKERS_TOKEN:-}" ]; then
+  echo "Setting up Cloudflare KeepAlive monitor..."
+  python3 "$APP_DIR/cloudflare-keepalive-setup.py" || true
 fi
 
 n8n start &

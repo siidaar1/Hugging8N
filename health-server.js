@@ -6,8 +6,7 @@ const PORT = Number(process.env.PUBLIC_PORT || 7861);
 const TARGET_PORT = Number(process.env.N8N_PORT || 5678);
 const TARGET_HOST = "127.0.0.1";
 const SYNC_STATUS_FILE = "/tmp/hugging8n-sync-status.json";
-const UPTIMEROBOT_STATUS_FILE = "/tmp/hugging8n-uptimerobot-status.json";
-const UPTIMEROBOT_API_KEY_SET = !!process.env.UPTIMEROBOT_API_KEY;
+const CLOUDFLARE_KEEPALIVE_STATUS_FILE = "/tmp/hugging8n-cloudflare-keepalive-status.json";
 const startTime = Date.now();
 
 function parseRequestUrl(url) {
@@ -31,10 +30,10 @@ function getStatus() {
   };
 }
 
-function getUptimeRobotStatus() {
+function getKeepaliveStatus() {
   try {
-    if (fs.existsSync(UPTIMEROBOT_STATUS_FILE)) {
-      return JSON.parse(fs.readFileSync(UPTIMEROBOT_STATUS_FILE, "utf8"));
+    if (fs.existsSync(CLOUDFLARE_KEEPALIVE_STATUS_FILE)) {
+      return JSON.parse(fs.readFileSync(CLOUDFLARE_KEEPALIVE_STATUS_FILE, "utf8"));
     }
   } catch {}
   return null;
@@ -62,222 +61,141 @@ function probeN8nHealth(timeoutMs = 1500) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function toneBadge(label, tone = "neutral") {
+  return `<span class="badge ${tone}">${escapeHtml(label)}</span>`;
+}
+
+function renderTile({ title, value, detail = "", tone = "neutral", meta = "" }) {
+  return `<article class="tile ${tone}">
+    <div class="tile-head">
+      <span class="tile-title">${escapeHtml(title)}</span>
+      <span class="tile-dot"></span>
+    </div>
+    <div class="tile-value">${value}</div>
+    ${detail ? `<div class="tile-detail">${detail}</div>` : ""}
+    ${meta ? `<div class="tile-meta">${meta}</div>` : ""}
+  </article>`;
+}
+
 function renderDashboard(data) {
-  const { status } = data.sync;
-  const getBadge = (status) => {
-    let cls = "status-offline";
-    if (
-      status === "success" ||
-      status === "configured" ||
-      status === "restored" ||
-      status === "synced"
-    )
-      cls = "status-online";
-    if (status === "syncing" || status === "restoring") cls = "status-syncing";
-    return `<div class="status-badge ${cls}">${cls === "status-online" ? '<div class="pulse"></div>' : ""}${String(status).toUpperCase()}</div>`;
-  };
+  const syncStatus = String(data.sync?.status || "unknown");
+  const syncTone = ["success", "restored", "synced", "configured"].includes(syncStatus)
+    ? "ok"
+    : syncStatus === "disabled"
+      ? "warn"
+      : "neutral";
+  const backupDetail = data.sync?.message ? escapeHtml(data.sync.message) : "No status yet";
 
-  const urStatus = data.uptimerobotStatus;
-  let keepAwakeHtml;
-  if (urStatus?.configured) {
-    keepAwakeHtml = `
-            <div class="helper-summary success">
-                ${getBadge("configured")}
-                <span>UptimeRobot monitor active for <code>${urStatus.url || "your /health endpoint"}</code>.</span>
-            </div>`;
-  } else if (urStatus?.configured === false) {
-    keepAwakeHtml = `
-            <div class="helper-summary error">
-                ${getBadge("failed")}
-                <span>Monitor setup failed. Check Space logs for details.</span>
-            </div>`;
-  } else if (UPTIMEROBOT_API_KEY_SET) {
-    keepAwakeHtml = `
-            <div class="helper-summary">
-                ${getBadge("syncing")} Setting up UptimeRobot monitor&hellip;
-            </div>`;
-  } else {
-    keepAwakeHtml = `
-            <div class="helper-summary">
-                <strong>Not configured.</strong> Add <code>UPTIMEROBOT_API_KEY</code> to Space secrets to enable keep-awake monitoring.
-            </div>`;
-  }
+  const keepaliveConfigured = data.keepalive?.configured === true;
+  const keepaliveStatus = String(
+    data.keepalive?.status ||
+      (process.env.CLOUDFLARE_WORKERS_TOKEN ? "pending" : "not configured"),
+  );
+  const keepAliveTone = keepaliveConfigured
+    ? "ok"
+    : process.env.CLOUDFLARE_WORKERS_TOKEN
+      ? "warn"
+      : "neutral";
+  const keepAliveDetail = keepaliveConfigured
+    ? `Pinging <code>${escapeHtml(data.keepalive.targetUrl || "/health")}</code>`
+    : process.env.CLOUDFLARE_WORKERS_TOKEN
+      ? "Worker pending or failed"
+      : "Not configured";
 
-  return `
-<!DOCTYPE html>
+  const tiles = [
+    renderTile({
+      title: "n8n Core",
+      value: toneBadge(data.n8nReady ? "Online" : "Offline", data.n8nReady ? "ok" : "off"),
+      detail: `Internal Port ${TARGET_PORT}`,
+      tone: data.n8nReady ? "ok" : "off",
+    }),
+    renderTile({
+      title: "Runtime",
+      value: escapeHtml(data.uptimeHuman),
+      detail: `Public Port ${PORT}`,
+      tone: "neutral",
+    }),
+    renderTile({
+      title: "Backup",
+      value: toneBadge(syncStatus.toUpperCase(), syncTone),
+      detail: backupDetail,
+      tone: syncTone,
+    }),
+    renderTile({
+      title: "Keep Awake",
+      value: toneBadge(keepaliveConfigured ? "CF Cron" : keepaliveStatus.toUpperCase(), keepAliveTone),
+      detail: keepAliveDetail,
+      tone: keepAliveTone,
+    }),
+  ].join("");
+
+  return `<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hugging8n Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --accent: #6366f1;
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --error: #ef4444;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Outfit', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .dashboard {
-            background: var(--card);
-            width: 100%;
-            max-width: 500px;
-            padding: 40px;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-        h1 { font-size: 2.5rem; margin-bottom: 8px; letter-spacing: -1px; }
-        .subtitle { color: var(--text-muted); margin-bottom: 32px; font-weight: 300; }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hugging8n</title>
+  <style>
+    :root { color-scheme: dark; --bg:#08080f; --panel:#12111b; --panel2:#151421; --line:#26243a; --text:#f6f4ff; --muted:#7f7a9e; --soft:#b8b3d7; --good:#22c55e; --warn:#f5c542; --bad:#fb7185; --accent:#6557df; --accent2:#7c6cf2; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); font-size:13px; }
+    main { width:min(720px, calc(100% - 32px)); margin:0 auto; padding:36px 0 44px; }
+    header { text-align:center; margin-bottom:22px; }
+    h1 { margin:0; font-size:1.65rem; line-height:1; letter-spacing:0; }
+    .subtitle { margin-top:12px; color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.14em; font-weight:800; }
+    .hero-action { display:flex; width:100%; min-height:46px; align-items:center; justify-content:center; border-radius:8px; background:#ffffff; color:#000000; text-decoration:none; font-weight:850; font-size:.98rem; margin:24px 0 20px; transition: background 0.15s ease; }
+    .hero-action:hover { background:#e5e5e5; }
+    .overview { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; margin-bottom:10px; }
+    .tile { border:1px solid var(--line); background:var(--panel); border-radius:11px; padding:18px; min-height:124px; display:flex; flex-direction:column; gap:10px; position:relative; }
+    .tile.ok { border-color:rgba(34,197,94,.22); }
+    .tile.warn { border-color:rgba(245,197,66,.24); }
+    .tile.off { border-color:rgba(251,113,133,.28); }
+    .tile-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .tile-title { color:var(--muted); font-size:.67rem; letter-spacing:.18em; text-transform:uppercase; font-weight:850; }
+    .tile-dot { width:7px; height:7px; border-radius:50%; background:var(--line); }
+    .tile.ok .tile-dot { background:var(--good); }
+    .tile.warn .tile-dot { background:var(--warn); }
+    .tile.off .tile-dot { background:var(--bad); }
+    .tile-value { font-size:1.12rem; font-weight:850; overflow-wrap:anywhere; }
+    .tile-detail { color:var(--soft); line-height:1.45; font-size:.83rem; }
+    .tile-meta { color:var(--muted); line-height:1.4; font-size:.75rem; margin-top:auto; overflow-wrap:anywhere; }
 
-        .stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: rgba(255,255,255,0.03);
-            padding: 20px;
-            border-radius: 16px;
-            text-align: left;
-        }
-        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
-        .stat-value { font-size: 1.25rem; font-weight: 600; }
-
-        .sync-box {
-            background: rgba(255,255,255,0.03);
-            padding: 24px;
-            border-radius: 16px;
-            margin-bottom: 32px;
-            text-align: left;
-            position: relative;
-        }
-        .sync-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .status-badge {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .status-online { background: rgba(34, 197, 94, 0.2); color: var(--success); }
-        .status-syncing { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-        .status-offline { background: rgba(239, 68, 68, 0.2); color: var(--error); }
-
-        .pulse {
-            width: 8px;
-            height: 8px;
-            background: currentColor;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.7; }
-            70% { transform: scale(1.5); opacity: 0; }
-            100% { transform: scale(0.95); opacity: 0; }
-        }
-
-        .btn-primary {
-            display: block;
-            width: 100%;
-            padding: 18px;
-            background: var(--accent);
-            color: white;
-            text-decoration: none;
-            border-radius: 16px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            transition: all 0.2s;
-            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
-            margin-bottom: 32px;
-        }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.4); }
-
-        .keep-alive {
-            border-top: 1px solid rgba(255,255,255,0.05);
-            padding-top: 24px;
-            text-align: left;
-        }
-        .keep-alive h3 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
-
-        .helper-summary {
-            margin-top: 14px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.03);
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            line-height: 1.5;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .helper-summary strong { color: var(--text); }
-        .helper-summary code {
-            background: rgba(255,255,255,0.06);
-            padding: 2px 6px;
-            border-radius: 6px;
-            font-size: 0.82rem;
-            color: var(--text);
-        }
-        .helper-summary.success { background: rgba(34, 197, 94, 0.08); }
-        .helper-summary.error { background: rgba(239, 68, 68, 0.08); }
-    </style>
+    code { background:#232234; border:1px solid #34324c; border-radius:6px; padding:2px 6px; color:var(--text); font-size:.9em; }
+    pre { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; background:#0d0d0d; border:1px solid var(--line); border-radius:7px; padding:10px; color:var(--soft); font-size:.82rem; line-height:1.45; }
+    .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .badge { display:inline-flex; align-items:center; width:max-content; border:1px solid var(--line); border-radius:999px; padding:5px 10px; font-size:.72rem; font-weight:850; line-height:1; text-transform:uppercase; }
+    .badge.ok { color:var(--good); border-color:rgba(34,197,94,.34); background:rgba(34,197,94,.11); }
+    .badge.warn { color:var(--warn); border-color:rgba(245,197,66,.34); background:rgba(245,197,66,.11); }
+    .badge.off { color:var(--bad); border-color:rgba(251,113,133,.34); background:rgba(251,113,133,.11); }
+    .badge.neutral { color:var(--soft); }
+    .muted { color:var(--muted); }
+    .button { display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:0 16px; border-radius:8px; color:#fff; background:var(--accent); text-decoration:none; font-weight:850; font-size:.9rem; }
+    .button.secondary { color:var(--text); background:#242424; border:1px solid var(--line); }
+    footer { color:var(--muted); text-align:center; font-size:.74rem; margin-top:18px; }
+    footer .live { color:var(--good); }
+    @media (max-width: 700px) { .overview { grid-template-columns:1fr; } main { width:min(100% - 22px, 720px); padding-top:28px; } }
+  </style>
 </head>
 <body>
-    <div class="dashboard">
-        <h1>🔗 Hugging8n</h1>
-        <p class="subtitle">Workflow Automation Space</p>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-label">Uptime</div>
-                <div class="stat-value">${data.uptimeHuman}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">n8n Port</div>
-                <div class="stat-value">${TARGET_PORT}</div>
-            </div>
-        </div>
-
-        <div class="sync-box">
-            <div class="sync-header">
-                <div class="stat-label">Sync Status</div>
-                ${getBadge(data.sync.status)}
-            </div>
-            <div class="stat-value" style="font-size: 1rem; margin-bottom: 4px;">Last Activity: ${data.sync.timestamp.split(".")[0]}Z</div>
-            <div class="stat-label" style="text-transform: none;">${data.sync.message}</div>
-        </div>
-
-        <a href="/home/workflows" target="_blank" class="btn-primary">Open n8n Editor</a>
-
-        <div class="keep-alive">
-            <span class="stat-label">Keep Space Awake</span>
-            ${keepAwakeHtml}
-        </div>
-    </div>
+  <main>
+    <header>
+      <h1>Hugging8n</h1>
+      <div class="subtitle">Workflow Automation Space</div>
+    </header>
+    <a class="hero-action" href="/home/workflows" target="_blank" rel="noopener noreferrer">Open n8n Editor -&gt;</a>
+    <section class="overview">
+      ${tiles}
+    </section>
+    <footer><span class="live">Live</span> status - Health endpoint: <code>/health</code></footer>
+  </main>
 </body>
 </html>`;
 }
@@ -295,34 +213,38 @@ const server = http.createServer(async (req, res) => {
         status: n8nReady ? "ok" : "degraded",
         n8nReady,
         ...getStatus(),
+        keepalive: getKeepaliveStatus(),
       }),
     );
   }
   if (pathname === "/status") {
     const uptime = Math.floor((Date.now() - startTime) / 1000);
     const n8nReady = await probeN8nHealth();
+    res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(
       JSON.stringify({
         uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
         n8nReady,
         sync: getStatus(),
+        keepalive: getKeepaliveStatus(),
       }),
     );
   }
   if (pathname === "/" || pathname === "/dashboard") {
     const uptime = Math.floor((Date.now() - startTime) / 1000);
+    const n8nReady = await probeN8nHealth();
     res.writeHead(200, { "Content-Type": "text/html" });
     return res.end(
       renderDashboard({
         uptimeHuman: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+        n8nReady,
         sync: getStatus(),
-        uptimerobotStatus: getUptimeRobotStatus(),
+        keepalive: getKeepaliveStatus(),
       }),
     );
   }
 
   // 2. n8n Proxy Logic
-  // Any path that isn't a dashboard route gets proxied to n8n.
   const proxyHeaders = {
     ...req.headers,
     host: `127.0.0.1:${TARGET_PORT}`,
@@ -394,7 +316,6 @@ server.on("upgrade", (req, socket, head) => {
   proxySocket.on("error", () => socket.destroy());
 });
 
-// Disable overall timeout for SSE, but keep keep-alive healthy
 server.timeout = 0;
 server.keepAliveTimeout = 65000;
 server.listen(PORT, "0.0.0.0", () =>
