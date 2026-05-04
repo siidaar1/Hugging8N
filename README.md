@@ -101,7 +101,6 @@ This is the easiest way. Hugging8n will handle the deployment for you.
 - It generates a secure, private `CLOUDFLARE_PROXY_SECRET`.
 - All restricted outbound traffic is automatically routed through this Worker.
 
-
 ## 💾 Persistent Backup
 
 Hugging8n automatically creates a private dataset named `hugging8n-backup` in your Hugging Face account.
@@ -172,7 +171,7 @@ Similar projects by [@somratpro](https://github.com/somratpro) — all free, one
 
 | Project | What it runs | HF Space | GitHub |
 | :--- | :--- | :--- | :--- |
-| **HuggingMess** | Hermes — Self-hosted agent gateway | [Space](https://huggingface.co/spaces/somratpro/HuggingMess) | [Repo](https://github.com/somratpro/huggingmess) |
+| **HuggingMes** | Hermes — Self-hosted agent gateway | [Space](https://huggingface.co/spaces/somratpro/HuggingMes) | [Repo](https://github.com/somratpro/huggingmes) |
 | **HuggingClaw** | OpenClaw — Claude Code in the browser | [Space](https://huggingface.co/spaces/somratpro/HuggingClaw) | [Repo](https://github.com/somratpro/huggingclaw) |
 | **HuggingClip** | Paperclip — AI agent orchestration platform | [Space](https://huggingface.co/spaces/somratpro/HuggingClip) | [Repo](https://github.com/somratpro/huggingclip) |
 
