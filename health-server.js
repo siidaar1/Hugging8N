@@ -6,7 +6,8 @@ const PORT = Number(process.env.PUBLIC_PORT || 7861);
 const TARGET_PORT = Number(process.env.N8N_PORT || 5678);
 const TARGET_HOST = "127.0.0.1";
 const SYNC_STATUS_FILE = "/tmp/hugging8n-sync-status.json";
-const CLOUDFLARE_KEEPALIVE_STATUS_FILE = "/tmp/hugging8n-cloudflare-keepalive-status.json";
+const CLOUDFLARE_KEEPALIVE_STATUS_FILE =
+  "/tmp/hugging8n-cloudflare-keepalive-status.json";
 const startTime = Date.now();
 
 function parseRequestUrl(url) {
@@ -33,7 +34,9 @@ function getStatus() {
 function getKeepaliveStatus() {
   try {
     if (fs.existsSync(CLOUDFLARE_KEEPALIVE_STATUS_FILE)) {
-      return JSON.parse(fs.readFileSync(CLOUDFLARE_KEEPALIVE_STATUS_FILE, "utf8"));
+      return JSON.parse(
+        fs.readFileSync(CLOUDFLARE_KEEPALIVE_STATUS_FILE, "utf8"),
+      );
     }
   } catch {}
   return null;
@@ -73,7 +76,13 @@ function toneBadge(label, tone = "neutral") {
   return `<span class="badge ${tone}">${escapeHtml(label)}</span>`;
 }
 
-function renderTile({ title, value, detail = "", tone = "neutral", meta = "" }) {
+function renderTile({
+  title,
+  value,
+  detail = "",
+  tone = "neutral",
+  meta = "",
+}) {
   return `<article class="tile ${tone}">
     <div class="tile-head">
       <span class="tile-title">${escapeHtml(title)}</span>
@@ -87,12 +96,16 @@ function renderTile({ title, value, detail = "", tone = "neutral", meta = "" }) 
 
 function renderDashboard(data) {
   const syncStatus = String(data.sync?.status || "unknown");
-  const syncTone = ["success", "restored", "synced", "configured"].includes(syncStatus)
+  const syncTone = ["success", "restored", "synced", "configured"].includes(
+    syncStatus,
+  )
     ? "ok"
     : syncStatus === "disabled"
       ? "warn"
       : "neutral";
-  const backupDetail = data.sync?.message ? escapeHtml(data.sync.message) : "No status yet";
+  const backupDetail = data.sync?.message
+    ? escapeHtml(data.sync.message)
+    : "No status yet";
 
   const keepaliveConfigured = data.keepalive?.configured === true;
   const keepaliveStatus = String(
@@ -113,7 +126,10 @@ function renderDashboard(data) {
   const tiles = [
     renderTile({
       title: "n8n Core",
-      value: toneBadge(data.n8nReady ? "Online" : "Offline", data.n8nReady ? "ok" : "off"),
+      value: toneBadge(
+        data.n8nReady ? "Online" : "Offline",
+        data.n8nReady ? "ok" : "off",
+      ),
       detail: `Internal Port ${TARGET_PORT}`,
       tone: data.n8nReady ? "ok" : "off",
     }),
@@ -134,7 +150,10 @@ function renderDashboard(data) {
     }),
     renderTile({
       title: "Keep Awake",
-      value: toneBadge(keepaliveConfigured ? "CF Cron" : keepaliveStatus.toUpperCase(), keepAliveTone),
+      value: toneBadge(
+        keepaliveConfigured ? "CF Cron" : keepaliveStatus.toUpperCase(),
+        keepAliveTone,
+      ),
       detail: keepAliveDetail,
       tone: keepAliveTone,
     }),
