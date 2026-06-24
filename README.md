@@ -20,6 +20,8 @@ secrets:
 [![HF Space](https://img.shields.io/badge/🤗%20HuggingFace-Space-blue?style=flat-square)](https://huggingface.co/spaces)
 [![n8n](https://img.shields.io/badge/n8n-Workflow-orange?style=flat-square)](https://n8n.io)
 
+⚠️ WARNING: USING THIS PROJECT MAY LEAD TO THE SUSPENSION OF YOUR HUGGINGFACE ACCOUNT.
+
 **Self-hosted n8n workflow automation — free, no server needed.** Hugging8n runs [n8n](https://n8n.io) on HuggingFace Spaces, providing a 24/7 automation engine for your workflows. It includes a premium management dashboard, automatic persistent backup to HF Datasets, and built-in connectivity fixes to bypass platform restrictions. Deploy in minutes on the free HF Spaces tier with full data persistence.
 
 ## Table of Contents
