@@ -19,17 +19,22 @@ RUN apt-get update && apt-get install -y -q --no-install-recommends \
 RUN pip3 install -q --no-cache-dir --break-system-packages huggingface_hub
 
 # Install n8n
-ARG N8N_VERSION=latest
-RUN npm install -g --loglevel=error n8n@${N8N_VERSION}
-
-# Copy all files
-COPY . .
-
-# Make scripts executable
-RUN chmod +x start.sh cloudflare-proxy-setup.py cloudflare-keepalive-setup.py n8n-sync.py
+RUN npm install -g --loglevel=error n8n@latest
 
 # Expose port
 EXPOSE 7861
 
-# Run the start script
-CMD ["bash", "start.sh"]
+# Configure n8n
+ENV N8N_PORT=7861
+ENV N8N_PROTOCOL=https
+ENV N8N_LISTEN_ADDRESS=0.0.0.0
+ENV N8N_SECURE_COOKIE=true
+ENV N8N_DIAGNOSTICS_ENABLED=false
+ENV N8N_PERSONALIZATION_ENABLED=false
+ENV N8N_LOG_LEVEL=error
+ENV N8N_PYTHON_NODES_ENABLED=false
+ENV N8N_TASK_RUNNERS_ENABLED=false
+ENV NODE_ENV=production
+
+# Start n8n
+CMD ["n8n", "start"]
