@@ -1,13 +1,8 @@
 FROM node:22-slim
 
-ARG N8N_VERSION=latest
+WORKDIR /home/node/app
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    N8N_PORT=5678 \
-    HF_HUB_DISABLE_PROGRESS_BARS=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_ROOT_USER_ACTION=ignore
-
+# Install system dependencies including build tools
 RUN apt-get update && apt-get install -y -q --no-install-recommends \
     ca-certificates \
     curl \
@@ -18,36 +13,31 @@ RUN apt-get update && apt-get install -y -q --no-install-recommends \
     python3-venv \
     sqlite3 \
     tini \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-    && pip3 install -q --no-cache-dir --break-system-packages huggingface_hub \
-    && npm install -g --loglevel=error n8n@${N8N_VERSION} \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /home/node/app /home/node/.n8n && \
-    chmod 700 /home/node/.n8n && \
-    chown -R node:node /home/node
+# Install Python packages
+RUN pip3 install -q --no-cache-dir --break-system-packages huggingface_hub
 
-WORKDIR /home/node/app
+# Install n8n
+ARG N8N_VERSION=latest
+RUN npm install -g --loglevel=error n8n@${N8N_VERSION}
 
-COPY --chown=node:node health-server.js /home/node/app/health-server.js
-COPY --chown=node:node cloudflare-proxy.js /opt/cloudflare-proxy.js
-COPY --chown=node:node cloudflare-proxy-setup.py /home/node/app/cloudflare-proxy-setup.py
+# Copy application files
+COPY start.sh health-server.js cloudflare-proxy.js cloudflare-proxy-setup.py cloudflare-keepalive-setup.py n8n-sync.py ./
 
-# Set NODE_OPTIONS after preload scripts are copied
-ENV NODE_OPTIONS="--require /opt/cloudflare-proxy.js"
-COPY --chown=node:node n8n-sync.py /home/node/app/n8n-sync.py
-COPY --chown=node:node cloudflare-keepalive-setup.py /home/node/app/cloudflare-keepalive-setup.py
-COPY --chown=node:node start.sh /home/node/app/start.sh
+# Set permissions
+RUN chmod +x start.sh cloudflare-proxy-setup.py cloudflare-keepalive-setup.py n8n-sync.py
 
-RUN chmod +x /home/node/app/start.sh /home/node/app/cloudflare-keepalive-setup.py /home/node/app/cloudflare-proxy-setup.py
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:7861/health || exit 1
 
-USER node
-
+# Expose port
 EXPOSE 7861
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s \
-  CMD curl -fsS http://localhost:7861/health || exit 1
-
+# Use tini as entrypoint
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/home/node/app/start.sh"]
+
+# Start the app
+CMD ["./start.sh"]
