@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y -q --no-install-recommends \
     python3-venv \
     sqlite3 \
     tini \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
     && pip3 install -q --no-cache-dir --break-system-packages huggingface_hub \
     && npm install -g --loglevel=error n8n@${N8N_VERSION} \
     && rm -rf /var/lib/apt/lists/*
