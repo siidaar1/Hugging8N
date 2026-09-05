@@ -24,7 +24,7 @@ ARG N8N_VERSION=latest
 RUN npm install -g --loglevel=error n8n@${N8N_VERSION}
 
 # Copy application files
-COPY start.sh health-server.js cloudflare-proxy.js cloudflare-proxy-setup.py cloudflare-keepalive-setup.py n8n-sync.py ./
+COPY . /home/node/app/
 
 # Set permissions
 RUN chmod +x start.sh cloudflare-proxy-setup.py cloudflare-keepalive-setup.py n8n-sync.py
